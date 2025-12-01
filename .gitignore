@@ -1,0 +1,32 @@
+# Build directories
+build/
+cmake-build-*/
+
+# Executables
+easymrc_main
+easymrc_test
+generate_test_data
+*.exe
+
+# Test output
+*.pgm
+*.json
+test_*.pgm
+violations.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# C++ build artifacts
+*.o
+*.a
+*.so
+*.dylib
