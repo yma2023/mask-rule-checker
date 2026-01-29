@@ -1,0 +1,9 @@
+# Strict Rule Configuration
+# More restrictive checking with smaller rule distance
+
+rule_distance: 30.0
+sampling_multiplier: 6.0
+threads: 8
+space_check: true
+width_check: true
+parallel: true

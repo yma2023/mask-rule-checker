@@ -14,13 +14,13 @@
 
 namespace easymrc {
 
-// Complete MRC checking pipeline
+
 class EasyMRC {
  public:
   struct Config {
-    double rule_distance_R;           // Space/width rule distance
+    double rule_distance_R;             // Space/width rule distance
     double sampling_radius_multiplier;  // Usually 4.0
-    int num_threads;                   // 0 = auto-detect
+    int num_threads;                    // 0 = auto-detect
     bool enable_space_check;
     bool enable_width_check;
     bool enable_parallel;
@@ -51,7 +51,6 @@ class EasyMRC {
 
   EasyMRC(const Config& config = Config()) : config_(config) {}
 
-  // Run complete MRC check
   Results run(const std::vector<Polygon>& polygons) {
     Results results;
 
@@ -78,38 +77,34 @@ class EasyMRC {
   void check_space_rules(const std::vector<Polygon>& polygons,
                         Results& results) {
 
-    // Step 1: Generate candidate pairs
+    // 候補ペア生成
     auto pairs = candidate_pair_generation(polygons, config_.rule_distance_R);
 
-    // Step 2: Check violations for each pair
     if (config_.enable_parallel && pairs.size() > 10) {
-      // Parallel execution
+      // 並列処理でチェック
       parallel_space_check(polygons, pairs, config_.rule_distance_R,
                           results.space_violations_type_a,
                           results.space_violations_type_b,
                           config_.sampling_radius_multiplier,
                           config_.num_threads);
     } else {
-      // Sequential execution
+      // 逐次処理でチェック
       for (const auto& pair : pairs) {
         const auto& poly1 = polygons[pair.first];
         const auto& poly2 = polygons[pair.second];
 
-        // Calculate sampling radius
         double r1 = calculate_sampling_radius(poly1,
                                              config_.sampling_radius_multiplier);
         double r2 = calculate_sampling_radius(poly2,
                                              config_.sampling_radius_multiplier);
         double r = std::max(r1, r2);
 
-        // Sample representatives
         std::vector<RepresentativePoint> rep_points_1, rep_points_2;
         std::vector<RepresentativeEdge> rep_edges_1, rep_edges_2;
 
         sample_representatives(poly1, r, rep_points_1, rep_edges_1);
         sample_representatives(poly2, r, rep_points_2, rep_edges_2);
 
-        // Check violations
         auto vio_a = detect_type_a_violations(rep_points_1, rep_points_2,
                                               config_.rule_distance_R, r);
         auto vio_b = detect_type_b_violations(rep_points_1, rep_points_2,
@@ -131,13 +126,11 @@ class EasyMRC {
                         Results& results) {
 
     if (config_.enable_parallel && polygons.size() > 10) {
-      // Parallel execution
       results.width_violations = parallel_width_check(
           polygons, config_.rule_distance_R,
           config_.sampling_radius_multiplier,
           config_.num_threads);
     } else {
-      // Sequential execution
       for (const auto& poly : polygons) {
         double r = calculate_sampling_radius(poly,
                                              config_.sampling_radius_multiplier);

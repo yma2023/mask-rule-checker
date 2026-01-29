@@ -37,6 +37,10 @@ target_link_libraries(easymrc_test PRIVATE easymrc)
 # Test data generator
 add_executable(generate_test_data test/generate_test_data.cpp)
 
+# GDSII test
+add_executable(test_gdsii test/test_gdsii.cpp)
+target_link_libraries(test_gdsii PRIVATE easymrc)
+
 # Installation
 install(TARGETS easymrc_main DESTINATION bin)
 install(DIRECTORY src/easymrc DESTINATION include)

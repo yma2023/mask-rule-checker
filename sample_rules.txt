@@ -1,0 +1,21 @@
+# EasyMRC Rule Configuration File
+# Lines starting with # are comments
+# Format: key: value
+
+# Rule distance for mask checking (in pixels)
+rule_distance: 50.0
+
+# Sampling radius multiplier for edge sampling
+sampling_multiplier: 4.0
+
+# Number of threads to use (0 or 'auto' for automatic detection)
+threads: auto
+
+# Enable/disable space checking (true/false or 1/0)
+space_check: true
+
+# Enable/disable width checking (true/false or 1/0)
+width_check: true
+
+# Enable/disable parallel execution (true/false or 1/0)
+parallel: true

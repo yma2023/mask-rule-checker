@@ -174,7 +174,7 @@ class ParallelWidthChecker {
   int num_threads_;
 };
 
-// Main parallel space checking function
+
 inline void parallel_space_check(
     const std::vector<Polygon>& polygons,
     const std::vector<std::pair<int, int>>& pairs,

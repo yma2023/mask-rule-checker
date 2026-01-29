@@ -2,28 +2,108 @@
 #include <fstream>
 #include <string>
 #include <chrono>
-#include <iomanip>
 
 #include "easymrc/easymrc.hpp"
 
 using namespace easymrc;
 
-void print_usage(const char* program_name) {
-  std::cerr << "Usage: " << program_name << " <input_file> [options]\n";
-  std::cerr << "\nOptions:\n";
-  std::cerr << "  -r <distance>    Rule distance (default: 50.0)\n";
-  std::cerr << "  -m <multiplier>  Sampling radius multiplier (default: 4.0)\n";
-  std::cerr << "  -t <threads>     Number of threads (default: auto)\n";
-  std::cerr << "  -o <output>      Output violations file (default: violations.json)\n";
-  std::cerr << "  --no-space       Disable space checking\n";
-  std::cerr << "  --no-width       Disable width checking\n";
-  std::cerr << "  --no-parallel    Disable parallel execution\n";
-  std::cerr << "\nSupported formats: PGM, PNG (future), PPM (future)\n";
-  std::cerr << "\nExamples:\n";
-  std::cerr << "  " << program_name << " mask.pgm -r 50 -t 8\n";
-  std::cerr << "  " << program_name << " test_pattern.pgm -r 100 -m 4 -o results.json\n";
+// 空白の除去
+std::string trim(const std::string& str) {
+  size_t start = str.find_first_not_of(" \t\r\n");
+  if (start == std::string::npos) return "";
+  size_t end = str.find_last_not_of(" \t\r\n");
+  return str.substr(start, end - start + 1);
 }
 
+// 設定ファイル読み込み
+EasyMRC::Config load_rule_file(const std::string& filename) {
+  std::ifstream file(filename);
+  if (!file.is_open()) {
+    throw std::runtime_error("Cannot open rule file: " + filename);
+  }
+
+  EasyMRC::Config config;
+  std::string line;
+  int line_number = 0;
+
+  while (std::getline(file, line)) {
+    line_number++;
+
+    size_t comment_pos = line.find('#');
+    if (comment_pos != std::string::npos) {
+      line = line.substr(0, comment_pos);
+    }
+
+    line = trim(line);
+
+    if (line.empty()) continue;
+
+    // key: value形式を解析
+    size_t colon_pos = line.find(':');
+    if (colon_pos == std::string::npos) {
+      std::cerr << "Warning: Invalid format at line " << line_number
+                << " (expected 'key: value'): " << line << std::endl;
+      continue;
+    }
+
+    std::string key = trim(line.substr(0, colon_pos));
+    std::string value = trim(line.substr(colon_pos + 1));
+
+    // 設定項目ごとに代入
+    if (key == "rule_distance") {
+        config.rule_distance_R = std::stod(value);
+
+    } else if (key == "sampling_multiplier") {
+        config.sampling_radius_multiplier = std::stod(value);
+        
+    } else if (key == "threads") {
+        if (value == "auto" || value == "0") {
+            config.num_threads = 0;
+        } else {
+            config.num_threads = std::stoi(value);
+        }
+
+    } else if (key == "space_check") {
+        config.enable_space_check = (value == "true" || value == "1");
+
+    } else if (key == "width_check") {
+        config.enable_width_check = (value == "true" || value == "1");
+
+    } else if (key == "parallel") {
+        config.enable_parallel = (value == "true" || value == "1");
+
+    } else {
+        std::cerr << "Warning: Unknown parameter '" << key
+                  << "' at line " << line_number << std::endl;
+    }
+
+  }
+
+  file.close();
+  return config;
+}
+
+// 使用方法の表示
+void print_usage(const char* program_name) {
+  std::cerr << "Usage: " << program_name << " <input_file> <output_file> <rule_file>\n";
+  std::cerr << "\nArguments:\n";
+  std::cerr << "  input_file      Input image file (PGM, PNG, or PPM format)\n";
+  std::cerr << "  output_file     Output violations file (JSON format)\n";
+  std::cerr << "  rule_file       Rule configuration file\n";
+  std::cerr << "\nRule file format:\n";
+  std::cerr << "  # Comment line\n";
+  std::cerr << "  rule_distance: 50.0\n";
+  std::cerr << "  sampling_multiplier: 4.0\n";
+  std::cerr << "  threads: 8  # or 'auto'\n";
+  std::cerr << "  space_check: true\n";
+  std::cerr << "  width_check: true\n";
+  std::cerr << "  parallel: true\n";
+  std::cerr << "\nExamples:\n";
+  std::cerr << "  " << program_name << " mask.pgm violations.json rules.txt\n";
+  std::cerr << "  " << program_name << " test_pattern.pgm results.json my_rules.txt\n";
+}
+
+// JSONログ出力
 void write_json_output(const std::string& filename,
                       const EasyMRC::Results& results,
                       double execution_time_ms) {
@@ -105,42 +185,27 @@ void write_json_output(const std::string& filename,
 }
 
 int main(int argc, char* argv[]) {
-  if (argc < 2) {
+  // 引数チェック
+  if (argc != 4) {
+    std::cerr << "Error: Expected exactly 3 arguments, got " << (argc - 1) << std::endl;
     print_usage(argv[0]);
     return 1;
   }
 
   std::string input_file = argv[1];
-  std::string output_file = "violations.json";
+  std::string output_file = argv[2];
+  std::string rule_file = argv[3];
 
+  // 設定ファイル読み込み
   EasyMRC::Config config;
-
-  // Parse command line arguments
-  for (int i = 2; i < argc; ++i) {
-    std::string arg = argv[i];
-
-    if (arg == "-r" && i + 1 < argc) {
-      config.rule_distance_R = std::stod(argv[++i]);
-    } else if (arg == "-m" && i + 1 < argc) {
-      config.sampling_radius_multiplier = std::stod(argv[++i]);
-    } else if (arg == "-t" && i + 1 < argc) {
-      config.num_threads = std::stoi(argv[++i]);
-    } else if (arg == "-o" && i + 1 < argc) {
-      output_file = argv[++i];
-    } else if (arg == "--no-space") {
-      config.enable_space_check = false;
-    } else if (arg == "--no-width") {
-      config.enable_width_check = false;
-    } else if (arg == "--no-parallel") {
-      config.enable_parallel = false;
-    } else {
-      std::cerr << "Unknown option: " << arg << std::endl;
-      print_usage(argv[0]);
-      return 1;
-    }
+  try {
+    config = load_rule_file(rule_file);
+  } catch (const std::exception& e) {
+    std::cerr << "Error loading rule file: " << e.what() << std::endl;
+    return 1;
   }
 
-  // Verify file type
+  // 入力ファイルの拡張子チェック
   std::string ext = input_file.substr(input_file.find_last_of(".") + 1);
   if (ext != "pgm" && ext != "png" && ext != "ppm") {
     std::cerr << "Error: Unsupported file type '" << ext << "'. "
@@ -171,12 +236,12 @@ int main(int argc, char* argv[]) {
     std::cout << "  Parallel: "
               << (config.enable_parallel ? "enabled" : "disabled") << "\n\n";
 
-    // Load polygons from image
+    // 画像読み込み → ポリゴン抽出
     std::cout << "Loading image file...\n";
     std::vector<Polygon> polygons = format_conversion(input_file);
     std::cout << "  Polygons extracted: " << polygons.size() << "\n\n";
 
-    // Run EasyMRC
+    // MRC を実行
     std::cout << "Running EasyMRC...\n";
 
     EasyMRC checker(config);
@@ -198,7 +263,7 @@ int main(int argc, char* argv[]) {
               << results.width_violations.size() << "\n";
     std::cout << "  Total violations: " << results.total_violations() << "\n\n";
 
-    // Write output
+    // JSONファイルへ出力
     std::cout << "Writing violations to: " << output_file << "\n";
     write_json_output(output_file, results, duration.count());
 
